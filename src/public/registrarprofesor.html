@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registro Profesor | AsisWeb</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <h1>Registro de Profesor</h1>
+
+  <div class="card">
+    <form id="form-profesor">
+      <input type="text" id="nombre-profesor" placeholder="Nombre completo" required />
+      <input type="email" id="correo-profesor" placeholder="Correo institucional" required />
+      <input type="password" id="password-profesor" placeholder="Contraseña" required />
+      <input type="password" id="password2-profesor" placeholder="Repetir contraseña" required />
+      <div style="margin:10px 0">
+        <style>
+          .materia-toggle { display: inline-block; padding: 8px 12px; border-radius: 20px; border: 1px solid #ccc; cursor: pointer; margin-right:8px; user-select:none; }
+          .materia-toggle.active { background: #2d8cff; color: #fff; border-color: #2d8cff; }
+        </style>
+        <div id="materias-toggle">
+          <div class="materia-toggle" data-value="Matematica">Matemática</div>
+          <div class="materia-toggle" data-value="Lenguaje">Lenguaje</div>
+        </div>
+      </div>
+      <button type="submit">Registrarse</button>
+      <div id="mensaje" class="msg"></div>
+    </form>
+
+    <a href="profesor.html">¿Ya tienes cuenta? Inicia sesión</a>
+  </div>
+
+  <script>
+ 
+    function validPass(p) {
+      return (
+        p.length >= 8 &&
+        /[A-Z]/.test(p) &&
+        /[0-9]/.test(p) &&
+        /[!@#$%^&*(),.?":{}|<>]/.test(p)
+      );
+    }
+
+    // attach toggle handlers so toggles work interactively
+    document.querySelectorAll('.materia-toggle').forEach(el=>{
+      el.addEventListener('click', ()=> el.classList.toggle('active'));
+    });
+
+    document.getElementById("form-profesor").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const nombre = document.getElementById("nombre-profesor").value.trim();
+      const correo = document.getElementById("correo-profesor").value.trim();
+      const p1 = document.getElementById("password-profesor").value.trim();
+      const p2 = document.getElementById("password2-profesor").value.trim();
+      const msg = document.getElementById("mensaje");
+
+      msg.textContent = "";
+      msg.className = "msg";
+
+      if (p1 !== p2) {
+        msg.textContent = " Las contraseñas no coinciden.";
+        msg.classList.add("error");
+        return;
+      }
+
+      if (!validPass(p1)) {
+        msg.textContent =
+          " La contraseña debe tener 8+ caracteres, una mayúscula, un número y un símbolo.";
+        msg.classList.add("error");
+        return;
+      }
+
+      try {
+        // collect selected materias from toggle buttons
+        const materias = Array.from(document.querySelectorAll('.materia-toggle.active')).map(d => d.getAttribute('data-value'));
+
+        const res = await fetch("/api/registro-profesor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre, correo, password: p1, materias }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          msg.textContent = " Registro enviado. Espera la confirmación del administrador.";
+          msg.classList.add("success");
+          document.getElementById("form-profesor").reset();
+        } else {
+          msg.textContent = " " + (data.error || "Error al registrar.");
+          msg.classList.add("error");
+        }
+      } catch (err) {
+        console.error(err);
+        msg.textContent = " No se pudo conectar con el servidor.";
+        msg.classList.add("error");
+      }
+    });
+  </script>
+
+</body>
+</html>

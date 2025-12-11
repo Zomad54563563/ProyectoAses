@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subir Tarea</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+    <div class="subir-container">
+        <h2>Subir Material / Tarea</h2>
+
+        <!-- Selector de materia -->
+        <div style="margin-bottom:10px; text-align:left;">
+            <label for="asignatura-select">Asignatura:</label>
+            <select id="asignatura-select" style="width:100%; padding:8px; margin-top:6px; border-radius:6px;">
+                <option value="">Seleccionar materia</option>
+            </select>
+        </div>
+
+        <!-- Input archivo -->
+        <input type="file" id="archivo" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" />
+
+        <!-- Botón subir -->
+        <button class="btn-subir" onclick="subirTarea()">Subir Archivo</button>
+
+        <!-- Mensaje -->
+        <div id="mensaje"></div>
+
+        <!-- Info del último archivo -->
+        <div id="ultima-subida" class="archivo-info" style="display:none;"></div>
+
+        <!-- Mis tareas subidas -->
+        <div id="mis-tareas" style="margin-top:18px; text-align:left;">
+            <h3>Mis materiales subidos</h3>
+            <div id="lista-mis-tareas">
+                <p>No hay materiales aún.</p>
+            </div>
+        </div>
+
+        <!-- Botón volver -->
+        <a href="panelprofesor.html" class="btn-volver">Volver al Panel</a>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const select = document.getElementById('asignatura-select');
+    const profesorId = localStorage.getItem('profesor_id') || 1;
+
+    let materias = localStorage.getItem('materias');
+    if (!materias) {
+        try {
+            const res = await fetch(`/api/profesor/${profesorId}`);
+            if (res.ok) {
+                const data = await res.json();
+                materias = data.materias;
+                if (materias) localStorage.setItem('materias', materias);
+            }
+        } catch (e) {}
+    }
+
+    // opciones por defecto
+    const defaults = ['Matematica', 'Lenguaje'];
+
+    let opciones = [];
+    if (materias) {
+        const arr = Array.isArray(materias) ? materias : materias.split(',');
+        opciones = arr.map(m => m.trim()).filter(Boolean);
+    }
+
+    // fusionar y eliminar duplicados, manteniendo los por defecto al inicio
+    const merged = Array.from(new Set([...defaults, ...opciones]));
+
+    select.innerHTML = `<option value="">Seleccionar materia</option>` + merged.map(m => `<option value="${m}">${m}</option>`).join('');
+});
+
+async function subirTarea() {
+    const archivoInput = document.getElementById("archivo");
+    const mensaje = document.getElementById("mensaje");
+    const ultima = document.getElementById("ultima-subida");
+
+    if (!archivoInput.files.length) {
+        mensaje.innerText = "Seleccione un archivo primero.";
+        mensaje.className = "msg-error";
+        mensaje.style.display = "block";
+        return;
+    }
+
+    const archivo = archivoInput.files[0];
+    const formData = new FormData();
+
+    formData.append("archivo", archivo);
+    formData.append("profesor_id", localStorage.getItem("profesor_id") || 1);
+    const asignatura = document.getElementById('asignatura-select')?.value || '';
+    formData.append('asignatura', asignatura);
+
+    try {
+        const response = await fetch("/api/profesor/subir-tarea", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            mensaje.innerText = "Archivo subido correctamente.";
+            mensaje.className = "msg-exito";
+            mensaje.style.display = "block";
+
+            ultima.innerHTML = `
+                <p><strong>Archivo:</strong> ${archivo.name}</p>
+                <p><strong>Tamaño:</strong> ${(archivo.size / 1024).toFixed(1)} KB</p>
+                <p><strong>Tipo:</strong> ${archivo.type || "Desconocido"}</p>
+            `;
+            ultima.style.display = "block";
+
+            archivoInput.value = "";
+            // recargar lista de tareas del profesor
+            cargarMisTareas();
+        } else {
+            throw new Error(data.error || "No se pudo subir el archivo.");
+        }
+
+    } catch (error) {
+        mensaje.innerText = error.message;
+        mensaje.className = "msg-error";
+        mensaje.style.display = "block";
+    }
+}
+
+// Cargar las tareas que el profesor ha subido
+async function cargarMisTareas() {
+    const cont = document.getElementById('lista-mis-tareas');
+    const profesorId = localStorage.getItem('profesor_id');
+    if (!profesorId) {
+        cont.innerHTML = '<p>Error: no estás logueado como profesor (faltó profesor_id en localStorage).</p>';
+        console.error('profesor_id missing in localStorage');
+        return;
+    }
+
+    cont.innerHTML = '<p>Cargando...</p>';
+    try {
+        const res = await fetch(`/api/profesor/${encodeURIComponent(profesorId)}/tareas`);
+        if (!res.ok) {
+            let msg = `HTTP ${res.status}`;
+            try { const body = await res.json(); if (body && body.error) msg += ' - ' + body.error; } catch (_) {}
+            throw new Error(msg);
+        }
+
+        const data = await res.json();
+        const tareas = data.tareas || [];
+        if (tareas.length === 0) {
+            cont.innerHTML = '<p>No hay materiales subidos.</p>';
+            return;
+        }
+
+        cont.innerHTML = tareas.map(t => `
+            <div class="material-card" data-id="${t.id}" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <div>
+                    <div style="font-weight:bold;">${t.nombre}</div>
+                    <div style="font-size:13px; color:#666;">${t.asignatura || 'Sin asignatura'} — ${new Date(t.fecha_subida).toLocaleString()}</div>
+                </div>
+                <div>
+                    <button class="btn-rojo" onclick="eliminarMiTarea(${t.id})">Eliminar</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error('Error cargando tareas:', e);
+        cont.innerHTML = `<p>Error al cargar las tareas: ${e.message}</p>`;
+    }
+}
+
+async function eliminarMiTarea(id) {
+    if (!confirm('¿Eliminar este material?')) return;
+    const profesorId = localStorage.getItem('profesor_id') || 1;
+    try {
+        const res = await fetch('/profesor/tarea/eliminar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, profesor_id: profesorId })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al eliminar');
+        // eliminar elemento del DOM inmediatamente
+        const el = document.querySelector(`[data-id="${id}"]`);
+        if (el) el.remove();
+        // recargar lista para mantener sincronía
+        cargarMisTareas();
+    } catch (e) {
+        alert('No se pudo eliminar el material: ' + (e.message || e));
+    }
+}
+
+
+// cargar lista al abrir la página
+document.addEventListener('DOMContentLoaded', () => cargarMisTareas());
+</script>
+
+</body>
+</html>

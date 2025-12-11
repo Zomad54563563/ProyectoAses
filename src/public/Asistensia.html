@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistencia del Profesor</title>
+    <link rel="stylesheet" href="../css/styles.css">
+ 
+</head>
+<body>
+
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <h1>Registro de Asistencia</h1>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <button onclick="regresarPanelProfesor()" class="btn-azul">Volver al Panel</button>
+                <button onclick="cerrarSesion()" class="btn-azul logout-btn">Cerrar Sesión</button>
+            </div>
+        </header>
+
+        <main class="dashboard-content">
+
+            <!-- Selección de sesión y materia -->
+            <section class="card">
+                <h2>Seleccionar Sesión</h2>
+                <input type="text" id="sesion" placeholder="Ejemplo: Clase 1, Laboratorio, Evaluación" class="input-text">
+                <div style="margin-top:10px">
+                    <label for="select-materia">Materia:</label>
+                    <select id="select-materia">
+                        <option value="Matematica">Matemática</option>
+                        <option value="Lenguaje">Lenguaje</option>
+                    </select>
+                </div>
+                <div style="margin-top:10px">
+                    <label style="color: white;">Modo de marcado:</label>
+                    <div style="display:inline-block; margin-left:10px">
+                        <button id="modo-asistio" class="btn-azul" style="margin-right:6px;">Asistió</button>
+                        <button id="modo-falto" class="btn-rojo">Faltó</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Lista de alumnos -->
+            <section class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>Lista de Alumnos</h2>
+                    <button onclick="cargarAlumnos()" class="btn-azul" style="padding: 8px 15px; margin-top: 0;">🔄 Recargar</button>
+                </div>
+
+                <div id="lista-alumnos">
+                    <p>Cargando alumnos...</p>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        // modo global (accesible desde las funciones fuera de DOMContentLoaded)
+        var modo = 'asistio';
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!localStorage.getItem('profesor_id')) {
+                alert("Debes iniciar sesión como profesor.");
+                window.location.href = 'profesor.html';
+                return;
+            }
+
+            cargarAlumnos();
+            // try to populate materia select from stored materias
+            const m = localStorage.getItem('profesor_materias');
+            if (m) {
+                const sel = document.getElementById('select-materia');
+                sel.innerHTML = m.split(',').map(x => `<option value="${x}">${x}</option>`).join('');
+            }
+            // modo default (use global `modo` variable)
+            modo = 'asistio';
+            const btnA = document.getElementById('modo-asistio');
+            const btnF = document.getElementById('modo-falto');
+            function updateModo(newModo){
+                modo = newModo;
+                if(modo==='asistio'){ btnA.classList.add('active'); btnF.classList.remove('active'); }
+                else { btnF.classList.add('active'); btnA.classList.remove('active'); }
+            }
+            btnA.addEventListener('click',(e)=>{ e.preventDefault(); updateModo('asistio'); });
+            btnF.addEventListener('click',(e)=>{ e.preventDefault(); updateModo('falto'); });
+            updateModo('asistio');
+        });
+
+        async function cargarAlumnos() {
+            const contenedor = document.getElementById('lista-alumnos');
+
+            try {
+                console.log('Intentando cargar alumnos...');
+                const response = await fetch('/api/profesor/alumnos');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Datos recibidos:', data);
+
+                if (!data.alumnos || data.alumnos.length === 0) {
+                    contenedor.innerHTML = '<p style="color: #e74c3c; text-align: center;">No hay alumnos registrados en el sistema.</p>';
+                    return;
+                }
+
+                const alumnosHTML = data.alumnos.map(a => `
+                    <div class="alumno-item" style="padding: 15px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px; background-color: #f9f9f9; color: #222;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong style="color:#111">${a.nombre}</strong><br>
+                                <small style="color: #444;">${a.correo}</small>
+                            </div>
+                            <div>
+                                <button class="btn-verde" onclick="marcarModo(${a.id})" style="margin-right: 5px;">Marcar</button>
+                                <button class="btn-azul" onclick="verRegistros(${a.id}, this)" style="margin-right:5px;">Ver registros</button>
+                                <button class="btn-rojo" onclick="eliminarUltima(${a.id})">Eliminar último</button>
+                            </div>
+                        </div>
+                        <div class="registros-container" id="registros-${a.id}" style="margin-top:8px; display:none;"></div>
+                    </div>
+                `).join('');
+                
+                contenedor.innerHTML = alumnosHTML;
+
+            } catch (error) {
+                console.error('Error en cargarAlumnos:', error);
+                contenedor.innerHTML = `<p style="color: #e74c3c;">Error cargando alumnos: ${error.message}</p>`;
+            }
+        }
+
+        async function marcarModo(alumno_id){
+            const sesion = document.getElementById("sesion").value;
+            const profesor_id = localStorage.getItem("profesor_id");
+            const asignatura = document.getElementById('select-materia')?.value || null;
+
+            if (!sesion) { alert("Debes ingresar el nombre de la sesión."); return; }
+
+            try {
+                const response = await fetch('/api/profesor/marcar-asistencia', {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ profesor_id, alumno_id, estado: modo, sesion, asignatura })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                if (data.success) alert(modo==='asistio'? '✓ Asistencia registrada' : '✗ Falta registrada');
+                else alert('Error: '+(data.error||'unknown'));
+            } catch(err){ console.error(err); alert('Error al guardar asistencia: '+err.message); }
+        }
+
+        async function verRegistros(alumno_id, btn){
+            const cont = document.getElementById(`registros-${alumno_id}`);
+            if(!cont) return;
+            if(cont.style.display==='block'){ cont.style.display='none'; return; }
+            cont.style.display='block';
+            cont.innerHTML = '<small>Cargando registros...</small>';
+            try{
+                const res = await fetch(`/api/alumno/asistencia/${alumno_id}`);
+                if(!res.ok) throw new Error('Error al obtener registros');
+                const json = await res.json();
+                const rows = json.sesiones || [];
+                if(rows.length===0){ cont.innerHTML = '<small>No hay registros</small>'; return; }
+                cont.innerHTML = rows.map(r=>`
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #eee;">
+                        <div><strong>${new Date(r.fecha).toLocaleDateString()}</strong> — ${r.sesion || ''} — <em>${r.asignatura||''}</em></div>
+                        <div><button class="btn-rojo" onclick="eliminarRegistro(${r.id}, ${alumno_id})">Eliminar</button></div>
+                    </div>
+                `).join('');
+            }catch(e){ console.error(e); cont.innerHTML = '<small>Error cargando registros</small>'; }
+        }
+
+        async function eliminarRegistro(id, alumno_id){
+            if(!confirm('Eliminar este registro?')) return;
+            try{
+                const res = await fetch('/api/profesor/eliminar-asistencia', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
+                if(!res.ok) throw new Error('Error servidor');
+                const d = await res.json();
+                if(d.success){ alert('Eliminado'); verRegistros(alumno_id); } else alert('No eliminado');
+            }catch(e){ console.error(e); alert('Error al eliminar'); }
+        }
+
+        async function eliminarUltima(alumno_id){
+            // fetch registros and delete the most recent
+            try{
+                const res = await fetch(`/api/alumno/asistencia/${alumno_id}`);
+                if(!res.ok) throw new Error('Error al obtener registros');
+                const json = await res.json();
+                const rows = json.sesiones || [];
+                if(rows.length===0){ alert('No hay registros para eliminar'); return; }
+                const id = rows[0].id;
+                if(!confirm('Eliminar el registro más reciente?')) return;
+                const del = await fetch('/api/profesor/eliminar-asistencia', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
+                const dd = await del.json();
+                if(dd.success) alert('Eliminado'); else alert('No se pudo eliminar');
+            }catch(e){ console.error(e); alert('Error al eliminar registro'); }
+        }
+
+        function cerrarSesion() {
+            localStorage.removeItem('profesor_id');
+            window.location.href = 'profesor.html';
+        }
+
+        function regresarPanelProfesor() {
+            // Navega al panel del profesor
+            window.location.href = 'panelprofesor.html';
+        }
+    </script>
+
+</body>
+</html>

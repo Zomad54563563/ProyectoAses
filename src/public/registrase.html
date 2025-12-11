@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registro Alumno | AsisWeb</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <h1>Registro de Alumno</h1>
+
+  <div class="card">
+    <form id="form-alumno">
+      <input type="text" id="nombre-alumno" placeholder="Nombre completo" required />
+      <input type="email" id="correo-alumno" placeholder="Correo institucional" required />
+      <input type="password" id="password-alumno" placeholder="Contraseña" required />
+      <input type="password" id="password2-alumno" placeholder="Repetir contraseña" required />
+      <button type="submit">Registrarse</button>
+      <div id="mensaje" class="msg"></div>
+    </form>
+
+    <a href="alumno.html">¿Ya tienes cuenta? Inicia sesión</a>
+  </div>
+
+  <script>
+    function validPass(p) {
+      return (
+        p.length >= 8 &&
+        /[A-Z]/.test(p) &&
+        /[0-9]/.test(p) &&
+        /[!@#$%^&*(),.?":{}|<>]/.test(p)
+      );
+    }
+
+    document.getElementById("form-alumno").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const nombre = document.getElementById("nombre-alumno").value.trim();
+      const correo = document.getElementById("correo-alumno").value.trim();
+      const p1 = document.getElementById("password-alumno").value.trim();
+      const p2 = document.getElementById("password2-alumno").value.trim();
+      const msg = document.getElementById("mensaje");
+
+      msg.textContent = "";
+      msg.className = "msg";
+
+      if (p1 !== p2) {
+        msg.textContent = " Las contraseñas no coinciden.";
+        msg.classList.add("error");
+        return;
+      }
+
+      if (!validPass(p1)) {
+        msg.textContent =
+          " La contraseña debe tener 8+ caracteres, una mayúscula, un número y un símbolo.";
+        msg.classList.add("error");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/registro-alumno", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre, correo, password: p1 }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          msg.textContent = " Registro exitoso. Redirigiendo...";
+          msg.classList.add("success");
+          setTimeout(() => (window.location.href = "alumno.html"), 2000);
+        } else {
+          msg.textContent = " " + (data.error || "Error al registrar.");
+          msg.classList.add("error");
+        }
+      } catch (err) {
+        console.error(err);
+        msg.textContent = " Error de conexión con el servidor.";
+        msg.classList.add("error");
+      }
+    });
+  </script>
+
+</body>
+</html>

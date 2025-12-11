@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel del Profesor</title>
+    <link rel="stylesheet" href="css/styles.css"> <!-- Tu CSS aparte -->
+</head>
+<body>
+
+    <div class="contenedor">
+        <h1>Panel del Profesor</h1>
+        <p>Selecciona una opción:</p>
+
+        <div class="botones">
+
+            <!-- Ir al horario -->
+            <a href="Panel_Profesor/horario.html" class="btn btn-azul">
+                Ver / Editar Horario
+            </a>
+
+            <!-- Subir tarea -->
+            <a href="Subirtarea.html" class="btn btn-verde">
+                Subir Tarea
+            </a>
+
+            <!-- Enviar mensaje -->
+            <a href="chat.html" class="btn btn-morado">
+                Enviar Mensaje a Alumnos
+            </a>
+
+            <a href="Asistensia.html" class="btn btn-morado">
+                Asistencia de Alumnos
+            </a>
+
+
+        </div>
+        
+        <!-- ---------------- MIS MATERIALES ---------------- -->
+        <section style="margin-top:25px; text-align:left;">
+            <h2>Mis Materiales</h2>
+            <div id="tareas-container">
+                <p>Cargando tareas...</p>
+            </div>
+        </section>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const profesorId = localStorage.getItem('profesor_id') || 1;
+        cargarTareas(profesorId);
+    });
+
+    async function cargarTareas(profesorId) {
+        const cont = document.getElementById('tareas-container');
+        cont.innerHTML = '<p>Cargando tareas...</p>';
+        try {
+            const res = await fetch(`/api/profesor/${encodeURIComponent(profesorId)}/tareas`);
+            if (!res.ok) throw new Error('Error al cargar');
+            const data = await res.json();
+            const tareas = data.tareas || [];
+            if (tareas.length === 0) {
+                cont.innerHTML = '<p>No hay tareas subidas.</p>';
+                return;
+            }
+
+            cont.innerHTML = tareas.map(t => `
+                <div class="material-card" data-id="${t.id}" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <div>
+                        <div style="font-weight:bold;">${t.nombre}</div>
+                        <div style="font-size:13px; color:#666;">${t.asignatura || 'Sin asignatura'} — ${new Date(t.fecha_subida).toLocaleString()}</div>
+                    </div>
+                    <div>
+                        <!-- Acciones gestionadas desde Subir Tarea -->
+                    </div>
+                </div>
+            `).join('');
+
+        } catch (e) {
+            cont.innerHTML = '<p>Error al cargar las tareas.</p>';
+        }
+    }
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inicio Profesor - AsisWeb</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <h1>Inicio de Sesión - Profesor</h1>
+
+  <div class="registro-container">
+    <div class="registro-card">
+      <form id="login-profesor">
+        <input type="email" id="correo" placeholder="Correo institucional" required>
+        <input type="password" id="password" placeholder="Contraseña" required>
+        <button type="submit" class="btn-azul">Iniciar Sesión</button>
+        <p id="mensaje" class="msg"></p>
+      </form>
+    </div>
+  </div>
+
+  <div class="extra-links">
+    <p>¿No tienes cuenta? <a href="registrarprofesor.html">Regístrate aquí</a></p>
+    <button onclick="location.href='index.html'" class="btn-volver">← Volver al inicio</button>
+  </div>
+
+  <script>
+    document.getElementById("login-profesor").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const correo = document.getElementById("correo").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const msg = document.getElementById("mensaje");
+
+      msg.textContent = "";
+      msg.className = "msg";
+
+      try {
+        const res = await fetch("/api/login-profesor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ correo, password })
+        });
+
+        const data = await res.json();
+        
+        if (data.success) {
+  msg.textContent = "Bienvenido, profesor. Redirigiendo...";
+  msg.classList.add("success");
+
+  // Guarda la sesión REAL
+  localStorage.setItem("profesorLogeado", "true");
+        localStorage.setItem("profesor_id", data.id); // 🔥 IMPORTANTE
+        if (data.materias) {
+          localStorage.setItem('profesor_materias', data.materias);
+        }
+
+  setTimeout(() => {
+    window.location.href = "panelprofesor.html";
+  }, 1500);
+}else {
+          msg.textContent = " " + (data.error || "Credenciales incorrectas.");
+          msg.classList.add("error");
+        }
+      } catch (error) {
+        msg.textContent = " No se pudo conectar con el servidor.";
+        msg.classList.add("error");
+      }
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Administrador</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <h1>Panel de Administrador</h1>
+
+  <!-- === LOGIN DEL ADMIN === -->
+  <div class="card" id="login-admin">
+    <h2>Iniciar Sesión</h2>
+    <form id="admin-login-form">
+      <input type="email" id="admin-correo" placeholder="Correo admin" required>
+      <input type="password" id="admin-password" placeholder="Contraseña" required>
+      <button type="submit">Entrar</button>
+    </form>
+    <p id="login-msg" class="msg"></p>
+  </div>
+
+  <!-- === PANEL DE GESTIÓN === -->
+  <div class="card" id="panel-admin" style="display:none;">
+    <h2>Profesores Pendientes</h2>
+    <table id="tabla-profesores">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Correo</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <button onclick="logoutAdmin()">Cerrar sesión</button>
+  </div>
+
+  <script>
+  // === LOGIN DEL ADMIN ===
+  document.getElementById("admin-login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const correo = document.getElementById("admin-correo").value.trim();
+    const password = document.getElementById("admin-password").value.trim();
+    const msg = document.getElementById("login-msg");
+
+    try {
+      const res = await fetch("/api/login-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ correo, password })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        msg.textContent = "✅ Sesión iniciada correctamente.";
+        msg.className = "msg success";
+        localStorage.setItem("adminLogeado", "true");
+        document.getElementById("login-admin").style.display = "none";
+        document.getElementById("panel-admin").style.display = "block";
+        cargarProfesores();
+      } else {
+        msg.textContent = data.error;
+        msg.className = "msg error";
+      }
+    } catch {
+      msg.textContent = "⚠️ No se pudo conectar con el servidor.";
+      msg.className = "msg error";
+    }
+  });
+
+  // === CARGAR PROFESORES PENDIENTES ===
+  async function cargarProfesores() {
+    const tabla = document.querySelector("#tabla-profesores tbody");
+    tabla.innerHTML = "";
+
+    const res = await fetch("/api/profesores-pendientes");
+    const profesores = await res.json();
+
+    if (profesores.length === 0) {
+      tabla.innerHTML = "<tr><td colspan='3'>No hay solicitudes pendientes.</td></tr>";
+      return;
+    }
+
+    profesores.forEach(p => {
+      const fila = document.createElement("tr");
+      fila.innerHTML = `
+        <td>${p.id}</td>
+        <td>${p.correo}</td>
+        <td>
+          <button class="btn-aceptar" onclick="aprobar(${p.id})">Aprobar</button>
+          <button class="btn-rechazar" onclick="rechazar(${p.id})">Rechazar</button>
+        </td>
+      `;
+      tabla.appendChild(fila);
+    });
+  }
+
+  // === FUNCIONES DE APROBACIÓN / RECHAZO ===
+  async function aprobar(id) {
+    await fetch("/api/aprobar-profesor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id })
+    });
+    cargarProfesores();
+  }
+
+  async function rechazar(id) {
+    await fetch("/api/rechazar-profesor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id })
+    });
+    cargarProfesores();
+  }
+
+  // === LOGOUT ===
+  function logoutAdmin() {
+    localStorage.removeItem("adminLogeado");
+    document.getElementById("panel-admin").style.display = "none";
+    document.getElementById("login-admin").style.display = "block";
+  }
+
+  // === AUTOLOGIN SI YA ESTÁ LOGEADO ===
+  window.addEventListener("DOMContentLoaded", () => {
+    if (localStorage.getItem("adminLogeado") === "true") {
+      document.getElementById("login-admin").style.display = "none";
+      document.getElementById("panel-admin").style.display = "block";
+      cargarProfesores();
+    }
+  });
+  </script>
+</body>
+</html>

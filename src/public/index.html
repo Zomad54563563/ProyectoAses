@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AsisWeb</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <h1>AsisWeb</h1>
+
+  <div class="dropdown">
+    <button class="dropdown-btn">Iniciar Sesión</button>
+
+    <div id="menu" class="dropdown-content">
+      <button onclick="location.href='alumno.html'">Alumno</button>
+      <button onclick="location.href='profesor.html'">Profesor</button>
+    </div>
+  </div>
+
+  <script>
+  window.addEventListener("DOMContentLoaded", () => {
+    const btn = document.querySelector('.dropdown-btn');
+    const menu = document.getElementById('menu');
+
+    btn.addEventListener('click', () => {
+      menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
+    });
+  });
+  </script>
+
+</body>
+</html>

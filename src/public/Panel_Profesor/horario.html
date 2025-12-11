@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Horario del Profesor</title>
+  <link rel="stylesheet" href="../css/styles.css">
+ 
+</head>
+<body>
+
+<header style="display:flex; justify-content:flex-end; gap:8px; padding:12px;">
+  <button onclick="regresarPanelProfesor()" class="btn-azul">Volver al Panel</button>
+</header>
+
+<div class="container">
+  <h1>Horario del Profesor</h1>
+
+  <div id="alert"></div>
+
+  <div class="button-group">
+    <button id="btnCurso" onclick="mostrarSelectorCurso()">📚 Seleccionar Curso</button>
+    <button id="btnGuardarMalla" onclick="guardarMallaCompleta()">💾 Guardar Cambios</button>
+  </div>
+
+  <div id="selectorCurso" class="selector-curso">
+    <select id="cursoSeleccionado">
+      <option disabled selected>Elige un curso</option>
+      <option>1° básico</option>
+      <option>2° básico</option>
+      <option>3° básico</option>
+      <option>4° básico</option>
+      <option>5° básico</option>
+      <option>6° básico</option>
+      <option>7° básico</option>
+      <option>8° básico</option>
+    </select>
+    <button onclick="guardarCurso()">Guardar</button>
+    <button onclick="ocultarSelectorCurso()">Cancelar</button>
+  </div>
+
+  <div id="infoCurso" class="info-seleccion" style="display: none;">
+    Curso: <strong id="cursoActual"></strong> | Haz clic en una celda para agregar una clase
+  </div>
+
+  <div class="table-wrapper">
+    <table id="tablaHorario">
+      <thead>
+        <tr>
+          <th>Hora</th>
+          <th>Lunes</th>
+          <th>Martes</th>
+          <th>Miércoles</th>
+          <th>Jueves</th>
+          <th>Viernes</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoHorario">
+        <tr><td>08:00</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>09:00</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>10:00</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>11:00</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>12:00</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>13:00</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>14:00</td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>15:00</td><td></td><td></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div id="modalClase" class="modal">
+    <div class="modal-content">
+      <h3 id="modalTitulo">Agregar Clase</h3>
+
+      <div class="form-group">
+        <label>Asignatura: <span style="color: red;">*</span></label>
+        <input id="asignatura" type="text" placeholder="Ej: Matemáticas">
+      </div>
+
+      <div class="form-group">
+        <label>Sala: <span style="color: red;">*</span></label>
+        <input id="sala" type="text" placeholder="Ej: A-101">
+      </div>
+
+      <div class="form-group" style="font-size: 12px; color: #666;">
+        <span id="infoHora"></span>
+      </div>
+
+      <div class="modal-buttons">
+        <button onclick="guardarClase()">Guardar</button>
+        <button onclick="cerrarModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let CURSO = null;
+let celdaSeleccionada = null;
+let claseSeleccionadaId = null;
+const PROFESOR_ID = 1;
+
+function mostrarAlerta(mensaje, tipo = 'success') {
+  const alertDiv = document.getElementById('alert');
+  alertDiv.innerHTML = `<div class="alert alert-${tipo}">${mensaje}</div>`;
+  setTimeout(() => {
+    alertDiv.innerHTML = '';
+  }, 4000);
+}
+
+// ========================
+// 1) SELECCIÓN DE CURSO
+// ========================
+function mostrarSelectorCurso() {
+  document.getElementById('selectorCurso').classList.add('active');
+}
+
+function ocultarSelectorCurso() {
+  document.getElementById('selectorCurso').classList.remove('active');
+}
+
+function guardarCurso() {
+  CURSO = document.getElementById('cursoSeleccionado').value;
+  if (!CURSO || CURSO === 'Elige un curso') {
+    mostrarAlerta('Por favor selecciona un curso', 'error');
+    return;
+  }
+
+  localStorage.setItem('cursoProfesor', CURSO);
+  ocultarSelectorCurso();
+
+  document.getElementById('btnCurso').innerText = '📚 Curso: ' + CURSO;
+  document.getElementById('infoCurso').style.display = 'block';
+  document.getElementById('cursoActual').innerText = CURSO;
+
+  cargarHorario();
+}
+
+window.addEventListener('load', () => {
+  const cursoGuardado = localStorage.getItem('cursoProfesor');
+  if (cursoGuardado) {
+    CURSO = cursoGuardado;
+    document.getElementById('btnCurso').innerText = '📚 Curso: ' + CURSO;
+    document.getElementById('infoCurso').style.display = 'block';
+    document.getElementById('cursoActual').innerText = CURSO;
+    cargarHorario();
+  }
+});
+
+// ========================
+// 2) CLICK EN CELDA
+// ========================
+function agregarEventosCeldas() {
+  document.querySelectorAll('#cuerpoHorario td:not(:first-child)').forEach((celda, index) => {
+    celda.addEventListener('click', function(e) {
+      if (e.target.classList.contains('clase-delete-btn')) {
+        return;
+      }
+
+      if (!CURSO) {
+        mostrarAlerta('Primero debes seleccionar un curso', 'error');
+        return;
+      }
+
+      let fila = celda.parentElement;
+      let hora = fila.children[0].innerText;
+      let dias = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+      let dia = dias[celda.cellIndex];
+
+      celdaSeleccionada = {
+        celda: celda,
+        hora: hora,
+        dia: dia
+      };
+
+      let claseExistente = celda.getAttribute('data-id');
+      if (claseExistente) {
+        claseSeleccionadaId = claseExistente;
+        document.getElementById('modalTitulo').innerText = 'Editar Clase';
+        document.getElementById('asignatura').value = celda.querySelector('.clase-asignatura')?.innerText || '';
+        document.getElementById('sala').value = celda.querySelector('.clase-sala')?.innerText || '';
+      } else {
+        claseSeleccionadaId = null;
+        document.getElementById('modalTitulo').innerText = 'Agregar Clase';
+        document.getElementById('asignatura').value = '';
+        document.getElementById('sala').value = '';
+      }
+
+      document.getElementById('infoHora').innerText = `${hora} - ${dia}`;
+      abrirModal();
+    });
+  });
+}
+
+// ========================
+// 3) GUARDAR CLASE
+// ========================
+function guardarClase() {
+  const asignatura = document.getElementById('asignatura').value.trim();
+  const sala = document.getElementById('sala').value.trim();
+
+  if (!asignatura || !sala) {
+    mostrarAlerta('Todos los campos son obligatorios', 'error');
+    return;
+  }
+
+  if (asignatura.length < 3) {
+    mostrarAlerta('La asignatura debe tener al menos 3 caracteres', 'error');
+    return;
+  }
+
+  fetch('/horario', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      profesor_id: PROFESOR_ID,
+      curso: CURSO,
+      hora: celdaSeleccionada.hora,
+      asignatura: asignatura,
+      sala: sala,
+      dia: celdaSeleccionada.dia
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      const html = `
+        <div class="clase-info">
+          <div class="clase-asignatura">${asignatura}</div>
+          <div class="clase-sala">${sala}</div>
+        </div>
+        <button class="clase-delete-btn" onclick="event.stopPropagation(); eliminarClase(${data.id})">✕</button>
+      `;
+      celdaSeleccionada.celda.innerHTML = html;
+      celdaSeleccionada.celda.setAttribute('data-id', data.id);
+      
+      mostrarAlerta(data.mensaje, 'success');
+      cerrarModal();
+    } else {
+      mostrarAlerta(data.error || 'Error al guardar', 'error');
+    }
+  })
+  .catch(err => {
+    mostrarAlerta('Error de conexión: ' + err.message, 'error');
+  });
+}
+
+// ========================
+// 4) ELIMINAR CLASE
+// ========================
+function eliminarClase(id) {
+  if (!confirm('¿Estás seguro de que deseas eliminar esta clase?')) {
+    return;
+  }
+
+  fetch(`/horario/${id}`, {
+    method: 'DELETE'
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      cargarHorario();
+      mostrarAlerta(data.mensaje, 'success');
+    } else {
+      mostrarAlerta(data.error || 'Error al eliminar', 'error');
+    }
+  })
+  .catch(err => {
+    mostrarAlerta('Error de conexión: ' + err.message, 'error');
+  });
+}
+
+// ========================
+// 5) CARGAR HORARIO
+// ========================
+function cargarHorario() {
+  document.querySelectorAll('#cuerpoHorario td:not(:first-child)').forEach(td => {
+    td.innerHTML = '';
+    td.removeAttribute('data-id');
+  });
+
+  fetch(`/horario/${PROFESOR_ID}`)
+    .then(r => r.json())
+    .then(data => {
+      let clasesCurso = data.filter(c => c.curso === CURSO);
+
+      clasesCurso.forEach(c => {
+        const filas = document.querySelectorAll('#cuerpoHorario tr');
+        filas.forEach(fila => {
+          if (fila.children[0].innerText === c.hora) {
+            const indexDia = {
+              'Lunes': 1,
+              'Martes': 2,
+              'Miércoles': 3,
+              'Jueves': 4,
+              'Viernes': 5
+            }[c.dia];
+
+            const celda = fila.children[indexDia];
+            const html = `
+              <div class="clase-info">
+                <div class="clase-asignatura">${c.asignatura}</div>
+                <div class="clase-sala">${c.sala}</div>
+              </div>
+              <button class="clase-delete-btn" onclick="event.stopPropagation(); eliminarClase(${c.id})">✕</button>
+            `;
+            celda.innerHTML = html;
+            celda.setAttribute('data-id', c.id);
+          }
+        });
+      });
+
+      agregarEventosCeldas();
+    })
+    .catch(err => {
+      mostrarAlerta('Error al cargar horario: ' + err.message, 'error');
+    });
+}
+
+// ========================
+// 6) MODAL
+// ========================
+function abrirModal() {
+  document.getElementById('modalClase').classList.add('active');
+  document.getElementById('asignatura').focus();
+}
+
+function cerrarModal() {
+  document.getElementById('modalClase').classList.remove('active');
+  celdaSeleccionada = null;
+  claseSeleccionadaId = null;
+}
+
+document.getElementById('modalClase').addEventListener('click', function(e) {
+  if (e.target === this) {
+    cerrarModal();
+  }
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    cerrarModal();
+  }
+});
+
+// ========================
+// 7) GUARDAR MALLA COMPLETA
+// ========================
+function guardarMallaCompleta() {
+  if (!CURSO) {
+    mostrarAlerta('Debes seleccionar un curso primero', 'error');
+    return;
+  }
+
+  mostrarAlerta('✅ Cambios guardados correctamente en la base de datos', 'success');
+}
+
+agregarEventosCeldas();
+
+function regresarPanelProfesor() {
+  window.location.href = '../panelprofesor.html';
+}
+</script>
+
+</body>
+</html>

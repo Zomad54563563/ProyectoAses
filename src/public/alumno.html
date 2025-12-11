@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio Alumno - AsisWeb</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <h1>Inicio de Sesión - Alumno</h1>
+    <div class="registro-container">
+        <div class="registro-card">
+            <form id="login-alumno">
+                <input type="email" id="correo" placeholder="Correo institucional" required>
+                <input type="password" id="password" placeholder="Contraseña" required>
+                <button type="submit" class="btn-azul">Iniciar Sesión</button>
+                <p id="mensaje" class="msg"></p>
+            </form>
+        </div>
+    </div>
+    <div class="extra-links">
+        <p>¿No tienes cuenta? <a href="registrase.html">Regístrate aquí</a></p>
+        <button onclick="location.href='index.html'" class="btn-volver">← Volver al inicio</button>
+    </div>
+    <script>
+        document.getElementById("login-alumno").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const correoInput = document.getElementById("correo");
+            const passwordInput = document.getElementById("password");
+            const msg = document.getElementById("mensaje");
+            const submitBtn = e.target.querySelector("button[type=submit]");
+            const correo = correoInput.value.trim();
+            const password = passwordInput.value.trim();
+
+            // Limpiar mensajes previos
+            msg.textContent = "";
+            msg.className = "msg";
+
+            // Validación básica de formato de email en el frontend
+            if (!correo.includes("@") || !correo.includes(".")) {
+                msg.textContent = "Por favor, ingresa un correo electrónico válido.";
+                msg.classList.add("error");
+                return;
+            }
+
+            // Deshabilitar botón para prevenir múltiples clics
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Iniciando...";
+
+            try {
+                const res = await fetch("/api/login-alumno", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ correo, password })
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    msg.textContent = "¡Bienvenido, alumno! Redirigiendo...";
+                    msg.classList.add("success");
+                    // Se asume que el backend devuelve el ID y nombre del alumno
+                    localStorage.setItem("alumnoLogeado", "true");
+                    localStorage.setItem('alumno_id', data.id); // Nuevo: Guardar ID del alumno
+                    localStorage.setItem("alumnoNombre", data.alumnoNombre); // Nuevo: Guardar nombre del alumno
+
+                    setTimeout(() => {
+                        window.location.href = "panelalumno.html";
+                    }, 1500);
+                } else {
+                    msg.textContent = data.error || "Credenciales incorrectas.";
+                    msg.classList.add("error");
+                }
+            } catch (error) {
+                msg.textContent = "No se pudo conectar con el servidor. Inténtalo más tarde.";
+                msg.classList.add("error");
+            } finally {
+                // Rehabilitar botón en caso de error
+                if (!msg.classList.contains("success")) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Iniciar Sesión";
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel del Alumno - AsisWeb</title>
+    <link rel="stylesheet" href="css/styles.css">
+
+    <style>
+       
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <h1>Panel del Alumno</h1>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <button class="btn-ver-horario" onclick="abrirModalHorario()">📅 Ver Horario</button>
+                <button onclick="cerrarSesion()" class="btn-azul logout-btn">Cerrar Sesión</button>
+            </div>
+        </header>
+
+        <main class="dashboard-content">
+
+            <!-- ---------------- HISTORIAL DE ASISTENCIA ---------------- -->
+            <section class="card">
+                <h2>Mi Historial de Asistencia <small id="filtro-actual" style="font-weight:normal; color:#555; margin-left:10px">(Todas)</small></h2>
+
+                <div class="attendance-summary">
+                    <div class="summary-item">
+                        <div class="value" id="total-sesiones">-</div>
+                        <div class="label">Total Sesiones</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="value" id="total-asistencias">-</div>
+                        <div class="label">Asistencias</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="value" id="total-faltas">-</div>
+                        <div class="label">Faltas</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="value" id="porcentaje-asistencia">-%</div>
+                        <div class="label">% Asistencia</div>
+                    </div>
+                </div>
+
+                <div id="tabla-asistencia-container">
+                    <p>Cargando historial...</p>
+                </div>
+            </section>
+
+            <!-- ---------------- MATERIALES DE CLASE ---------------- -->
+            <section class="card">
+                <h2 style="color: white;">Materiales de Clase</h2>
+                <p style="color: white;">Descarga los archivos subidos por tus profesores. Te notificaremos si hay actualizaciones.</p>
+
+                <div class="materiales-container" id="lista-materiales">
+                    <p>Cargando materiales...</p>
+                </div>
+            </section>
+
+        </main>
+    </div>
+    </div>
+
+    <!-- ---------------- CHAT: recuadro integrado para alumno ---------------- -->
+    <div class="chat-wrapper">
+        <section class="chat-card">
+            <div class="chat-header">💬 Chat con Profesor</div>
+            <div class="chat-controls">
+                <label for="chat-profesor-select">Profesor:</label>
+                <select id="chat-profesor-select" style="padding:6px">
+                    <option value="">Cargando profesores...</option>
+                </select>
+                <button id="chat-open" class="btn-azul">Abrir Chat</button>
+                <div style="margin-left:auto; color:#666; font-size:13px;">Enviar: Enter o botón</div>
+            </div>
+
+            <div id="chat-area" class="chat-area" style="display:none;">
+                <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
+                <div class="chat-input-row">
+                    <input id="chat-msg" placeholder="Escribe un mensaje..." aria-label="Mensaje" autocomplete="off">
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div id="notification-container"></div>
+
+    <!-- MODAL DEL HORARIO -->
+    <div id="modal-horario" class="modal-horario">
+        <div class="modal-horario-content">
+            <div class="modal-horario-header">
+                <h2>📅 Horario de Clases</h2>
+                <button class="btn-cerrar-horario" onclick="cerrarModalHorario()">✕ Cerrar</button>
+            </div>
+
+            <div class="modal-selector-curso">
+                <label for="modal-selector-curso-select">Selecciona un curso:</label>
+                <select id="modal-selector-curso-select" onchange="cargarHorarioPorCursoModal(this.value)">
+                    <option value="">Cargando cursos...</option>
+                </select>
+            </div>
+
+            <div id="modal-horario-tabla" style="display: none; overflow-x: auto; border-radius: 8px; border: 3px solid #ddd; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                <table id="modal-tabla-horario" style="width: 100%; border-collapse: collapse; background: white; color: #222; font-size: 18px;">
+                    <thead>
+                        <tr style="background: #667eea; color: white;">
+                            <th style="padding: 25px 20px; text-align: center; border: 3px solid #ddd; font-size: 20px; font-weight: 700;">Hora</th>
+                            <th style="padding: 25px 20px; text-align: center; border: 3px solid #ddd; font-size: 20px; font-weight: 700;">Lunes</th>
+                            <th style="padding: 25px 20px; text-align: center; border: 3px solid #ddd; font-size: 20px; font-weight: 700;">Martes</th>
+                            <th style="padding: 25px 20px; text-align: center; border: 3px solid #ddd; font-size: 20px; font-weight: 700;">Miércoles</th>
+                            <th style="padding: 25px 20px; text-align: center; border: 3px solid #ddd; font-size: 20px; font-weight: 700;">Jueves</th>
+                            <th style="padding: 25px 20px; text-align: center; border: 3px solid #ddd; font-size: 20px; font-weight: 700;">Viernes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modal-cuerpo-horario">
+                        <!-- Se llenará con JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="modal-mensaje-sin-horario" style="text-align: center; padding: 50px 30px; color: #999; font-size: 18px;">
+                <p>Selecciona un curso para ver su horario</p>
+            </div>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+
+    if (!localStorage.getItem('alumnoLogeado')) {
+        window.location.href = 'alumno.html';
+        return;
+    }
+
+    const filtroCont = document.createElement('div');
+    filtroCont.style.margin = '10px 0';
+    filtroCont.innerHTML = `
+        <label for="filtro-materia">Filtrar por materia:</label>
+        <select id="filtro-materia">
+            <option value="">Todas</option>
+            <option value="Matematica">Matemática</option>
+            <option value="Lenguaje">Lenguaje</option>
+        </select>
+    `;
+
+    const card = document.querySelector('.card');
+    card.insertBefore(filtroCont, document.getElementById('tabla-asistencia-container'));
+
+    await cargarHistorialAsistencia();
+
+    const filtroSel = document.getElementById('filtro-materia');
+    if (filtroSel) {
+        filtroSel.addEventListener('change', cargarHistorialAsistencia);
+        filtroSel.addEventListener('change', cargarMateriales);
+    }
+
+    await cargarMateriales();
+
+    setInterval(cargarHistorialAsistencia, 10000);
+    setInterval(checkForNewMaterials, 30000);
+});
+
+
+async function cargarHistorialAsistencia() {
+    const container = document.getElementById('tabla-asistencia-container');
+    try {
+        const alumnoID = localStorage.getItem('alumno_id');
+        const filtro = document.getElementById('filtro-materia')?.value || '';
+
+        const filtroActual = document.getElementById('filtro-actual');
+        if(filtroActual) filtroActual.textContent = filtro ? `(${filtro})` : '(Todas)';
+
+        const url = `/api/alumno/asistencia/${alumnoID}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('No se pudo cargar el historial.');
+
+        const data = await response.json();
+        const sesionesAll = data.sesiones || [];
+        const sesionesFiltered = filtro 
+            ? sesionesAll.filter(s => (s.asignatura || '').toLowerCase() === filtro.toLowerCase())
+            : sesionesAll;
+
+        renderizarAsistencia({ sesiones: sesionesFiltered });
+
+    } catch (error) {
+        container.innerHTML = '<p>Error al cargar los datos. Inténtelo más tarde.</p>';
+    }
+}
+
+
+function renderizarAsistencia(data) {
+    const container = document.getElementById('tabla-asistencia-container');
+    const sesiones = data.sesiones || [];
+
+    if (sesiones.length === 0) {
+        container.innerHTML = '<p>No hay registros de asistencia.</p>';
+        return;
+    }
+
+    let totalAsistencias = 0;
+    let totalFaltas = 0;
+
+    const tablaHTML = `
+        <div style="overflow:auto; max-width:100%;">
+        <table style="min-width:600px; color:#222">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Sesión</th>
+                    <th>Asignatura</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${sesiones.map(sesion => {
+                    const estadoClase = sesion.estado === 'asistio' ? 'asistio' : 'falto';
+                    const estadoTexto = sesion.estado === 'asistio' ? 'Asistió' : 'Faltó';
+
+                    if (sesion.estado === 'asistio') totalAsistencias++;
+                    else totalFaltas++;
+
+                    return `
+                        <tr>
+                            <td>${new Date(sesion.fecha).toLocaleDateString('es-ES')}</td>
+                            <td>${sesion.sesion || 'Sesión'}</td>
+                            <td>${sesion.asignatura || '-'}</td>
+                            <td class="${estadoClase}">${estadoTexto}</td>
+                        </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        </table>
+        </div>
+    `;
+
+    container.innerHTML = tablaHTML;
+
+    document.getElementById('total-sesiones').textContent = sesiones.length;
+    document.getElementById('total-asistencias').textContent = totalAsistencias;
+    document.getElementById('total-faltas').textContent = totalFaltas;
+    document.getElementById('porcentaje-asistencia').textContent =
+        sesiones.length > 0 ? Math.round((totalAsistencias / sesiones.length) * 100) + '%' : '0%';
+}
+
+/* ------------------------ MATERIAL DE CLASE ------------------------ */
+
+async function cargarMateriales() {
+    const lista = document.getElementById('lista-materiales');
+    try {
+        const filtro = document.getElementById('filtro-materia')?.value || '';
+        const url = filtro ? `/api/alumno/materiales?asignatura=${encodeURIComponent(filtro)}` : '/api/alumno/materiales';
+        const response = await fetch(url);
+        if (!response.ok) throw new Error();
+
+        const data = await response.json();
+        renderizarMateriales(data);
+
+    } catch (error) {
+        lista.innerHTML = '<p>Error al cargar los materiales.</p>';
+    }
+}
+
+
+function renderizarMateriales(data) {
+    const lista = document.getElementById("lista-materiales");
+    const materiales = data.materiales || [];
+
+    if (materiales.length === 0) {
+        lista.innerHTML = '<p>No hay materiales disponibles.</p>';
+        return;
+    }
+
+    localStorage.setItem("materialesIds", JSON.stringify(materiales.map(m => m.id)));
+
+    lista.innerHTML = materiales.map(material => {
+        const fecha = new Date(material.fecha_subida).toLocaleDateString("es-ES");
+
+        const ext = material.nombre.split(".").pop().toLowerCase();
+        let iconClass = "icon-other";
+
+        if (ext === "pdf") iconClass = "icon-pdf";
+        if (["doc", "docx"].includes(ext)) iconClass = "icon-doc";
+        if (["xls", "xlsx"].includes(ext)) iconClass = "icon-xls";
+        if (["ppt", "pptx"].includes(ext)) iconClass = "icon-ppt";
+
+        return `
+            <div class="material-card">
+                <div class="material-info">
+                    <div class="material-icon ${iconClass}">📄</div>
+                    <div>
+                        <div class="material-name">${material.nombre}</div>
+                        <div class="material-date">Subido el ${fecha}</div>
+                    </div>
+                </div>
+                <button class="btn-descargar" onclick="descargarMaterial(${material.id}, '${material.nombre}')">Descargar</button>
+            </div>
+        `;
+    }).join("");
+}
+
+
+async function descargarMaterial(id, nombre) {
+    try {
+        const response = await fetch(`/api/alumno/materiales/${id}/descargar`);
+        if (!response.ok) throw new Error();
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nombre;
+        a.click();
+
+        window.URL.revokeObjectURL(url);
+
+        showNotification('Descarga iniciada', 'success');
+
+    } catch (err) {
+        showNotification('No se pudo descargar el archivo.', 'error');
+    }
+}
+
+async function checkForNewMaterials() {
+    try {
+        const filtro = document.getElementById('filtro-materia')?.value || '';
+        const url = filtro ? `/api/alumno/materiales?asignatura=${encodeURIComponent(filtro)}` : '/api/alumno/materiales';
+        const response = await fetch(url);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const materiales = data.materiales || [];
+        const nuevosIds = materiales.map(m => m.id);
+        const viejosIds = JSON.parse(localStorage.getItem('materialesIds') || '[]');
+
+        const hayNuevos = nuevosIds.some(id => !viejosIds.includes(id));
+
+        if (hayNuevos && viejosIds.length > 0) {
+            showNotification('Nuevo material disponible', 'info');
+            renderizarMateriales(data);
+        }
+
+    } catch {}
+}
+
+
+/* ------------------------ NOTIFICACIONES ------------------------ */
+function showNotification(message, type = 'info') {
+    const container = document.getElementById('notification-container');
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.textContent = message;
+
+    if (type === 'error') notification.style.backgroundColor = '#dc3545';
+    else if (type === 'info') notification.style.backgroundColor = '#17a2b8';
+
+    container.appendChild(notification);
+
+    notification.offsetHeight;
+    notification.classList.add('show');
+
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => container.removeChild(notification), 500);
+    }, 4000);
+}
+
+
+function cerrarSesion() {
+    localStorage.removeItem('alumnoLogeado');
+    localStorage.removeItem('materialesIds');
+    window.location.href = 'alumno.html';
+}
+
+/* ------------------------ HORARIO DE CURSOS (ALUMNO) ------------------------ */
+
+async function cargarCursosParaHorario() {
+    try {
+        const response = await fetch('/api/horarios/todos');
+        if (!response.ok) throw new Error('No se pudo cargar los cursos');
+
+        const data = await response.json();
+        const cursos = data.cursos || [];
+        const selector = document.getElementById('selector-curso-horario');
+
+        if (cursos.length === 0) {
+            selector.innerHTML = '<option value="">No hay cursos disponibles</option>';
+            return;
+        }
+
+        selector.innerHTML = '<option value="">Selecciona un curso</option>' +
+            cursos.map(curso => `<option value="${curso}">${curso}</option>`).join('');
+
+        selector.addEventListener('change', (e) => {
+            if (e.target.value) {
+                cargarHorarioPorCurso(e.target.value);
+            } else {
+                document.getElementById('horario-container').style.display = 'none';
+                document.getElementById('mensaje-sin-horario').style.display = 'block';
+            }
+        });
+
+    } catch (error) {
+        console.error('Error cargando cursos:', error);
+        const selector = document.getElementById('selector-curso-horario');
+        selector.innerHTML = '<option value="">Error al cargar cursos</option>';
+    }
+}
+
+async function cargarHorarioPorCurso(curso) {
+    try {
+        const response = await fetch(`/api/horarios/curso/${encodeURIComponent(curso)}`);
+        if (!response.ok) throw new Error('No se pudo cargar el horario');
+
+        const data = await response.json();
+        const horarios = data.horarios || [];
+
+        if (horarios.length === 0) {
+            document.getElementById('horario-container').style.display = 'none';
+            document.getElementById('mensaje-sin-horario').style.display = 'block';
+            document.getElementById('mensaje-sin-horario').innerHTML = `
+                <p>No hay clases registradas para ${curso}</p>
+            `;
+            return;
+        }
+
+        renderizarHorario(horarios);
+        document.getElementById('mensaje-sin-horario').style.display = 'none';
+        document.getElementById('horario-container').style.display = 'block';
+
+    } catch (error) {
+        console.error('Error cargando horario:', error);
+        document.getElementById('mensaje-sin-horario').innerHTML = '<p>Error al cargar el horario</p>';
+        document.getElementById('mensaje-sin-horario').style.display = 'block';
+    }
+}
+
+function renderizarHorario(horarios) {
+    const tbody = document.getElementById('cuerpo-horario-alumno');
+
+    // Obtener horas únicas y ordenadas
+    const horas = [...new Set(horarios.map(h => h.hora))].sort();
+    const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+
+    let html = '';
+
+    horas.forEach(hora => {
+        html += `<tr>`;
+        html += `<td style="padding: 25px 20px; text-align: center; border: 3px solid #ddd; font-weight: 700; background: #f8f9fa; font-size: 18px; min-width: 120px; height: 140px; vertical-align: middle;">${hora}</td>`;
+
+        dias.forEach(dia => {
+            const clase = horarios.find(h => h.hora === hora && h.dia === dia);
+            if (clase) {
+                html += `
+                    <td style="padding: 25px 20px; text-align: center; border: 3px solid #ddd; background: #f0f4ff; min-width: 180px; height: 140px; vertical-align: middle;">
+                        <div style="font-weight: 700; color: #667eea; margin-bottom: 10px; font-size: 18px;">${clase.asignatura}</div>
+                        <div style="font-size: 16px; color: #666;">Sala: ${clase.sala}</div>
+                    </td>
+                `;
+            } else {
+                html += `<td style="padding: 25px 20px; text-align: center; border: 3px solid #ddd; background: #fafafa; min-width: 180px; height: 140px;"></td>`;
+            }
+        });
+
+        html += `</tr>`;
+    });
+
+    tbody.innerHTML = html;
+}
+
+/* ------------------------ MODAL DEL HORARIO (FLOTANTE) ------------------------ */
+
+async function abrirModalHorario() {
+    document.getElementById('modal-horario').classList.add('active');
+    
+    // Cargar lista de cursos si aún no está cargada
+    try {
+        const response = await fetch('/api/horarios/todos');
+        if (!response.ok) throw new Error('No se pudo cargar los cursos');
+
+        const data = await response.json();
+        const cursos = data.cursos || [];
+        const selector = document.getElementById('modal-selector-curso-select');
+
+        if (cursos.length === 0) {
+            selector.innerHTML = '<option value="">No hay cursos disponibles</option>';
+            return;
+        }
+
+        selector.innerHTML = '<option value="">Selecciona un curso</option>' +
+            cursos.map(curso => `<option value="${curso}">${curso}</option>`).join('');
+
+    } catch (error) {
+        console.error('Error cargando cursos:', error);
+    }
+}
+
+function cerrarModalHorario() {
+    document.getElementById('modal-horario').classList.remove('active');
+}
+
+async function cargarHorarioPorCursoModal(curso) {
+    if (!curso) {
+        document.getElementById('modal-horario-tabla').style.display = 'none';
+        document.getElementById('modal-mensaje-sin-horario').style.display = 'block';
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/horarios/curso/${encodeURIComponent(curso)}`);
+        if (!response.ok) throw new Error('No se pudo cargar el horario');
+
+        const data = await response.json();
+        const horarios = data.horarios || [];
+
+        if (horarios.length === 0) {
+            document.getElementById('modal-horario-tabla').style.display = 'none';
+            document.getElementById('modal-mensaje-sin-horario').style.display = 'block';
+            document.getElementById('modal-mensaje-sin-horario').innerHTML = `
+                <p>No hay clases registradas para ${curso}</p>
+            `;
+            return;
+        }
+
+        renderizarHorarioModal(horarios);
+        document.getElementById('modal-mensaje-sin-horario').style.display = 'none';
+        document.getElementById('modal-horario-tabla').style.display = 'block';
+
+    } catch (error) {
+        console.error('Error cargando horario:', error);
+        document.getElementById('modal-mensaje-sin-horario').innerHTML = '<p>Error al cargar el horario</p>';
+        document.getElementById('modal-mensaje-sin-horario').style.display = 'block';
+    }
+}
+
+function renderizarHorarioModal(horarios) {
+    const tbody = document.getElementById('modal-cuerpo-horario');
+
+    // Obtener horas únicas y ordenadas
+    const horas = [...new Set(horarios.map(h => h.hora))].sort();
+    const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+
+    let html = '';
+
+    horas.forEach(hora => {
+        html += `<tr>`;
+        html += `<td style="padding: 25px 20px; text-align: center; border: 3px solid #ddd; font-weight: 700; background: #f8f9fa; font-size: 18px; min-width: 120px; height: 140px; vertical-align: middle;">${hora}</td>`;
+
+        dias.forEach(dia => {
+            const clase = horarios.find(h => h.hora === hora && h.dia === dia);
+            if (clase) {
+                html += `
+                    <td style="padding: 25px 20px; text-align: center; border: 3px solid #ddd; background: #f0f4ff; min-width: 180px; height: 140px; vertical-align: middle;">
+                        <div style="font-weight: 700; color: #667eea; margin-bottom: 10px; font-size: 18px;">${clase.asignatura}</div>
+                        <div style="font-size: 16px; color: #666;">Sala: ${clase.sala}</div>
+                    </td>
+                `;
+            } else {
+                html += `<td style="padding: 25px 20px; text-align: center; border: 3px solid #ddd; background: #fafafa; min-width: 180px; height: 140px;"></td>`;
+            }
+        });
+
+        html += `</tr>`;
+    });
+
+    tbody.innerHTML = html;
+}
+
+// Cerrar modal al hacer clic fuera
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('modal-horario');
+    const modalContent = document.querySelector('.modal-horario-content');
+    const btnVerHorario = document.querySelector('.btn-ver-horario');
+    
+    if (e.target === modal && !modalContent.contains(e.target) && !btnVerHorario.contains(e.target)) {
+        cerrarModalHorario();
+    }
+});
+
+// Cerrar con tecla ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        cerrarModalHorario();
+    }
+});
+
+/* ------------------------ CHAT (ALUMNO) ------------------------ */
+let chatPoll = null;
+let currentProfesor = null;
+
+// Inicialización de elementos y eventos del chat
+document.addEventListener('DOMContentLoaded', () => {
+    // cargar lista de profesores
+    fetch('/api/profesores').then(r=>r.json()).then(rows=>{
+        const sel = document.getElementById('chat-profesor-select');
+        if (!sel) return;
+        if (!rows || !rows.length) { sel.innerHTML = '<option value="">No hay profesores</option>'; return; }
+        sel.innerHTML = '<option value="">Seleccione profesor</option>' + rows.map(p=>`<option value="${p.id}">${escapeHtml(p.nombre||p.correo||('Profesor '+p.id))} (ID ${p.id})</option>`).join('');
+        const stored = localStorage.getItem('profesor_id'); if (stored) sel.value = stored;
+    }).catch(()=>{ const sel = document.getElementById('chat-profesor-select'); if (sel) sel.innerHTML = '<option value="">Error cargando</option>'; });
+
+    const openBtn = document.getElementById('chat-open');
+    const sendBtn = document.getElementById('chat-send');
+    const chatInput = document.getElementById('chat-msg');
+
+    if (openBtn) openBtn.addEventListener('click', () => {
+        const profId = (document.getElementById('chat-profesor-select').value || localStorage.getItem('profesor_id') || '').trim();
+        if (!profId) return alert('Ingrese el ID del profesor.');
+        document.getElementById('chat-area').style.display = 'flex';
+        startChat(profId);
+    });
+
+    if (sendBtn) sendBtn.addEventListener('click', sendChatMessage);
+
+    if (chatInput) chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendChatMessage(); } });
+});
+
+async function startChat(profesorId) {
+    currentProfesor = profesorId;
+    await loadChatMessages();
+    if (chatPoll) clearInterval(chatPoll);
+    chatPoll = setInterval(loadChatMessages, 3000);
+}
+
+async function loadChatMessages() {
+    try {
+        const alumnoId = localStorage.getItem('alumno_id');
+        if (!alumnoId || !currentProfesor) return;
+        const res = await fetch(`/api/chat/conversation?alumno_id=${encodeURIComponent(alumnoId)}&profesor_id=${encodeURIComponent(currentProfesor)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const mensajes = data.mensajes || [];
+        const cont = document.getElementById('chat-messages');
+
+        if (!cont) return;
+        if (!mensajes.length) {
+            cont.innerHTML = '<p style="color:#999;text-align:center;margin:12px 0;">Sin mensajes aún</p>';
+            return;
+        }
+
+        cont.innerHTML = mensajes.map(m => {
+            const tiempo = new Date(m.fecha || m.created_at || Date.now()).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+            const isAlumno = m.from === 'alumno' || m.from === 'alumno' || m.from === 'me';
+            const bubbleClass = isAlumno ? 'msg-me' : 'msg-them';
+            return `<div style="display:flex; gap:8px; margin-bottom:8px; justify-content:${isAlumno? 'flex-end':'flex-start'}"><div style="width:100%"><div class="msg-bubble ${bubbleClass}">${escapeHtml(m.text||m.mensaje)}</div><div class="msg-time" style="text-align:${isAlumno? 'right':'left'}">${tiempo}</div></div></div>`;
+        }).join('');
+
+        // scroll to bottom after render
+        setTimeout(()=>{ cont.scrollTop = cont.scrollHeight; }, 40);
+    } catch (e) {
+        console.error('Error cargando mensajes:', e);
+    }
+}
+
+function escapeHtml(str){ if(!str && str !== 0) return ''; return String(str).replace(/[&<>"']/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s])); }
+
+async function sendChatMessage() {
+    try {
+        const alumnoId = localStorage.getItem('alumno_id');
+        const profId = currentProfesor || document.getElementById('chat-profesor-select')?.value;
+        const input = document.getElementById('chat-msg');
+        const text = input?.value.trim();
+        if (!text) return;
+        if (!alumnoId || !profId) return alert('Faltan IDs.');
+
+        const res = await fetch('/api/chat/send', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({from:'alumno', alumno_id:alumnoId, profesor_id:profId, mensaje:text})
+        });
+
+        if (res.ok) {
+            if (input) input.value = '';
+            await loadChatMessages();
+        } else {
+            showNotification('Error al enviar el mensaje.','error');
+        }
+    } catch (e) {
+        showNotification('No se pudo enviar el mensaje.','error');
+    }
+}
+</script>
+
+</body>
+</html>
