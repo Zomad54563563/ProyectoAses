@@ -673,8 +673,11 @@ app.get('/api/chat/conversation', (req, res) => {
 
 // Nota: edición y eliminación de tareas ahora están implementadas en el router de profesor (/profesor/*)
 
+app.use(express.static(path.join(__dirname, "public")));
 
-
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/index.html"));
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Servidor online en http://localhost:${PORT}`));
